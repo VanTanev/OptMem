@@ -12,7 +12,7 @@
   {memo} import <file>    bulk-load dated memories (bootstrap only).
 
 The memories live in ~/.optmem/memory, or in $MEMORY_DIR if set.
-See github.com/VictorTaelin/OptMem.
+See github.com/VanTanev/OptMem.
 """
 
 import datetime

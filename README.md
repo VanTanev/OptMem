@@ -2,12 +2,14 @@
 
 Permanent memory for AI agents. A 426-token prompt, a script, plug and play.
 
+A fork of [VictorTaelin/OptMem](https://github.com/VictorTaelin/OptMem).
+
 ![how OptMem works](anim/optmem.gif)
 
 ## Install
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/VictorTaelin/OptMem/main/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/VanTanev/OptMem/main/install.sh | sh
 ```
 
 It prints a `## Memory` block. Paste that at the top of your agent's
