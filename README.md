@@ -43,7 +43,7 @@ background.
 
 ```sh
 memo config                  # show the sizes
-memo config WAKE_LINES=300   # how many lines wake prints (96 ≈ 8k tokens)
+memo config WAKE_LINES=300   # how many lines wake prints (80 ≈ 7k tokens, one part)
 memo config WAKE_LINES=      # back to the default
 ```
 

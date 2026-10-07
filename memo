@@ -48,12 +48,14 @@ ME = pretty(__file__)
 # what it means. `memo config` shows and edits them. The globals below start
 # at these defaults, so a memory that overrides nothing follows the tool.
 KNOBS = {
-    "WAKE_LINES": (96, "the memory context: how many lines wake prints"),
+    "WAKE_LINES": (80, "the memory context: how many lines wake prints"),
     "ENTRY_CHARS": (280, "the longest one memory may be, in bytes"),
-    "PART_CHARS": (20000, "output paging: largest part, in bytes"),
+    "PART_CHARS": (25000, "output paging: largest part, in bytes"),
     "PART_LINES": (500, "output paging: largest part, in lines"),
 }
-WAKE_LINES = KNOBS["WAKE_LINES"][0]  # ~8k tokens of dense text, in 2 parts
+# ~7k tokens of dense text, in one part: 80 lines of at most ~300 bytes each
+# fit PART_CHARS, so a default wake is one command.
+WAKE_LINES = KNOBS["WAKE_LINES"][0]
 ENTRY_CHARS = KNOBS["ENTRY_CHARS"][0]
 # Every harness truncates a command that prints too much, and each drops a
 # different piece: Claude Code cuts the middle at 30,000 chars, pi cuts the
