@@ -155,6 +155,8 @@ check(noenv.returncode == 1 and "memo init" in noenv.stderr,
 init = subprocess.run(memo + ["init"], capture_output=True, text=True, env=fresh)
 check(init.returncode == 0 and "## Memory" in init.stdout
       and "You are a" in init.stdout, "init must print the AGENTS.md block")
+check("Never include a date or timestamp in memory text" in init.stdout,
+      "init must keep date metadata out of memory text")
 check(os.path.exists(os.path.join(fresh["HOME"], ".optmem", "memory", "config")),
       "init must create ~/.optmem/memory with its config")
 again = subprocess.run(memo + ["init"], capture_output=True, text=True, env=fresh)
@@ -234,7 +236,11 @@ check("None" not in r.stdout, "the refusal printed a Python None")
 # nap loop, with a fake compressor
 naps = 0
 r = run("nap")
-check("Compress memories #" in r.stdout, "nap prompt must name its object")
+check("Distill memories #" in r.stdout, "nap prompt must name its object")
+check("Never include a date or timestamp" in r.stdout,
+      "nap prompt must keep date metadata out of summaries")
+check("1. Rules and preferences" in r.stdout,
+      "a bare nap must show the full rules")
 while "Nothing left to compress" not in r.stdout:
     line = offered(r.stdout)
     check(bool(line), "no command offered:\n" + r.stdout + r.stderr)
@@ -246,6 +252,10 @@ while "Nothing left to compress" not in r.stdout:
     body = [l.strip() for l in r.stdout.splitlines() if l.startswith("  #")]
     r = run("nap", bid, (" ".join(body)[:280]).strip() or "empty")
     check(r.returncode == 0, "nap rejected a valid merge: " + r.stderr)
+    if "Nothing left to compress" not in r.stdout:
+        check("by the same rules as the last one" in r.stdout
+              and "1. Rules and preferences" not in r.stdout,
+              "a chained nap must point back to the rules, not repeat them")
     naps += 1
 check("You are awake" not in r.stdout,
       "nap must never claim the agent is awake; only wake may")
@@ -530,7 +540,7 @@ for i in range(32):
     run("note", "half probe memory %d" % i, store=d4)
 while True:
     r = run("nap", store=d4)
-    if "Compress memories #0-31 " in r.stdout:
+    if "Distill memories #0-31 " in r.stdout:
         break
     run("nap", nap_id(r.stdout), "settled", store=d4)
 with open(os.path.join(d4, "TREE", "16"), "r+b") as f:
