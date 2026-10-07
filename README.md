@@ -56,6 +56,13 @@ seek. At a million memories (608 MB), `wake` takes 0.03s.
 
 Set `$MEMORY_DIR` to keep `memory/` elsewhere — a synced folder, a git repo.
 
+`note`, `nap` and `import` refuse text shaped like a credential, because the
+log is never edited and every wake would repeat it. The rules come from
+[betterleaks](https://github.com/betterleaks/betterleaks) and Microsoft's
+[security-utilities](https://github.com/microsoft/security-utilities), both
+MIT, pinned in `tools/gen_credentials.py`; run it to regenerate them in
+`memo`, or with `--check` to see that they are current.
+
 ## The prompt
 
 This is what the installer prints, and the whole of the integration.
