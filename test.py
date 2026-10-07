@@ -8,8 +8,10 @@ import contextlib
 import datetime
 import io
 import os
+import random
 import re
 import shutil
+import string
 import subprocess
 import sys
 import tempfile
@@ -612,30 +614,57 @@ shutil.rmtree(d3)
 
 # a credential in a memory is permanent: the log is append-only and every
 # wake hands it to every future session. The shapes are built by joining
-# pieces, so this file does not itself look like it holds a secret.
-CREDS = ("sk-" + "ant-api03-" + "a1B2" * 6, "sk-" + "proj-" + "Z9y8" * 6,
-         "sk-" + "a1B2c3D4" * 3, "gh" + "p_" + "a1" * 18,
-         "github" + "_pat_" + "1a" * 20, "AK" + "IA" + "ABCDEFGH23456789",
-         "xo" + "xb-" + "1234567890-abcdef", "-----BEGIN " + "RSA PRIVATE KEY",
-         "AI" + "za" + "b1" * 17 + "c", "sk_" + "live_" + "c3" * 12,
-         "gl" + "pat-" + "d4" * 10,
-         "ey" + "JhbGciOiJIUzI1NiJ9.ey" + "JzdWIiOiIxMjM0NTY3ODkwIn0.sig",
-         "AS" + "IA" + "ABCDEFGH23456789", "sk_" + "test_" + "c3" * 12,
-         "hf" + "_" + "a1B2" * 9, "npm" + "_" + "a1B2" * 9,
-         "xa" + "pp-1-A0123456789-abcdef", "ya" + "29." + "a1B2c3" * 4,
-         "OPENAI_KEY_" + "sk-" + "a1B2c3D4" * 3,
-         # shapes from gitleaks' default rules
-         "py" + "pi-AgEIcHlwaS5vcmc" + "a1B2" * 13, "sb" + "p_" + "0a1b" * 10,
-         "sb_" + "secret_" + "a1B2" * 6, "do" + "p_v1_" + "0a" * 32,
-         "SG" + ".a1B2c3D4e5F6g7H8i9J0kL." + "a1B2c3D4e5F6g7H8i9J0" * 2 + "abc",
-         "SK" + "0123456789abcdef" * 2, "ts" + "key-auth-" + "kA1b2C3d4E5f6G7h8I9j0",
-         "lin" + "_api_" + "a1B2" * 10, "ops" + "_eyJ" + "a1B2" * 20,
-         "https://hooks.slack.com/" + "services/T0000/B0000/" + "a1B2" * 6,
+# pieces, so this file does not itself look like it holds a secret, and
+# their bodies are random: the rules pass `a1a1a1...` as a placeholder.
+rng = random.Random(280)
+B62 = string.ascii_letters + string.digits
+HEX = "0123456789abcdef"
+
+
+def rnd(n, chars=B62):
+    return "".join(rng.choice(chars) for _ in range(n))
+
+
+CREDS = ("sk-" + "ant-api03-" + rnd(93, B62 + "_-") + "AA",
+         "sk-" + "proj-" + rnd(74) + "T3Blbk" + "FJ" + rnd(74),
+         "sk-" + rnd(32), "gh" + "p_" + rnd(36),
+         "github" + "_pat_" + rnd(22) + "_" + rnd(59),
+         "AK" + "IA" + rnd(16, string.ascii_uppercase + "234567"),
+         "xo" + "xb-" + rnd(11, string.digits) + "-" + rnd(12, string.digits)
+         + "-" + rnd(24), "-----BEGIN " + "RSA PRIVATE KEY",
+         "AI" + "za" + rnd(35, B62 + "_-"), "sk_" + "live_" + rnd(24),
+         "gl" + "pat-" + rnd(20),
+         "ey" + "JhbGciOiJIUzI1NiJ9.ey" + "JzdWIiOiIxMjM0NTY3ODkwIn0."
+         + rnd(43, B62 + "_-"),
+         "AS" + "IA" + rnd(16, string.ascii_uppercase + "234567"),
+         "sk_" + "test_" + rnd(24), "hf" + "_" + rnd(34, string.ascii_letters),
+         "npm" + "_" + rnd(36),
+         "xa" + "pp-1-A" + rnd(10, string.ascii_uppercase + string.digits)
+         + "-" + rnd(13, string.digits) + "-" + rnd(64, HEX),
+         "ya" + "29." + rnd(60, B62 + "_-"),
+         "OPENAI_KEY_" + "sk-" + rnd(32),
+         # shapes from betterleaks' rules
+         "py" + "pi-AgEIcHlwaS5vcmc" + rnd(60, B62 + "_-"),
+         "sb" + "p_" + rnd(40, HEX), "sb_" + "secret_" + rnd(31),
+         "do" + "p_v1_" + rnd(64, HEX),
+         "SG" + "." + rnd(22, B62 + "_-") + "." + rnd(43, B62 + "_-"),
+         "twilio " + "SK" + rnd(32, HEX),
+         "ts" + "key-auth-" + rnd(12) + "CNTRL-" + rnd(30),
+         "lin" + "_api_" + rnd(40), "ops" + "_eyJ" + rnd(260, B62 + "+/"),
+         "https://hooks.slack.com/" + "services/T" + rnd(10) + "/B"
+         + rnd(10) + "/" + rnd(24),
          "postgres://app:" + "s3cretPass" + "@db.internal/app",
-         "wh" + "sec_" + "a1B2" * 8, "sk-" + "or-v1-" + "0a1b" * 8,
-         "shp" + "at_" + "0a1b" * 8, "da" + "pi" + "0a1b" * 8,
-         "AGE-SECRET-" + "KEY-1" + "QPZRY9X8GF" * 5 + "QPZRY9X8")
+         "wh" + "sec_" + rnd(32, B62 + "+/"), "sk-" + "or-v1-" + rnd(64, HEX),
+         "shp" + "at_" + rnd(32, HEX), "da" + "pi" + rnd(32, HEX),
+         "AGE-SECRET-" + "KEY-1" + rnd(58, "QPZRY9X8GF2TVDW0S3JN54KHCE6MUA7L"),
+         # ...and from Microsoft's: an Entra app secret, an Azure DevOps
+         # PAT, an Azure Storage key
+         rnd(3) + "8" + "Q~" + rnd(31, B62 + "_.-"),
+         rnd(52) + "JQQJ" + "99" + rnd(1) + "C" + rnd(12) + "AAAAA" + "ZDO"
+         + rnd(4),
+         rnd(76, B62 + "+/") + "+AS" + "t" + rnd(5) + "A==")
 # ...and none of these is one: they must still be recorded
+UUID = "-".join(rnd(n, HEX) for n in (8, 4, 4, 4, 12))
 FINE = ("key is op://Vault/Item/field",
         "the task-orchestration-pipeline-for-deploys is live",
         "risk-assessment-2026-matrix-v2 approved", "uses sk-learn for this",
@@ -653,7 +682,38 @@ FINE = ("key is op://Vault/Item/field",
         "logged as https://user:***@host, https://user:REDACTED@host",
         "or https://user:xxx@host and https://user:password@host",
         "tskey-reusable-keys-are-configured-in-admin",
-        "sb_secret_keys_are_rotated_monthly")
+        "sb_secret_keys_are_rotated_monthly",
+        "whsec_xxxxxxxxxxxxxxxxxxxxxxxxxxxx is the doc's placeholder",
+        # what memory holds every day: hashes, ids, paths, the names of
+        # secrets and where they live
+        "fixed the flaky test in commit " + rnd(40, HEX) + " on main",
+        "merged https://github.com/VanTanev/OptMem/pull/4; squash " +
+        rnd(7, HEX),
+        "subscription " + UUID + " holds the prod AKS cluster",
+        "/subscriptions/" + UUID + "/resourceGroups/rg-prod/providers/"
+        "Microsoft.KeyVault/vaults/kv-prod holds the app secrets",
+        "the tenant id is " + UUID + " (public, not a secret)",
+        "Key Vault secret db-password in kv-prod; never paste its value",
+        "the Stripe API key lives in 1Password, Engineering, 'stripe live'",
+        "the access token expires after 3600s; refresh with az account "
+        "get-access-token",
+        "image sha256:" + rnd(64, HEX) + " is the last good build",
+        "build 20231005.3 failed at 'npm ci' with ERR_SOCKET_TIMEOUT",
+        "gh keeps its token in the keyring, not /home/ivan/.config/gh",
+        "run `kubectl get secret app-secrets -o yaml` for keys, not values",
+        "the JWT header eyJhbGciOiJIUzI1NiJ9 is only the algorithm",
+        "export API_KEY=$STRIPE_KEY in CI; the value is a variable group",
+        "auth header format: Authorization: Bearer <token>",
+        "SSH host key fingerprint SHA256:" + rnd(43, B62 + "+/"),
+        "a base64 test vector: " + rnd(32, B62 + "+/"),
+        "webpack names it main." + rnd(20, HEX) + ".js",
+        "jwt kid header = " + rnd(32, HEX), "nonce " + rnd(24, HEX),
+        "token: " + rnd(40, HEX) + " is a git sha used as a cache key",
+        "secret: see vault path kv/data/prod/payments",
+        "client_secret is in kv-prod under the name aad-app-secret",
+        "the Azure DevOps PAT expires 2026-12-01; renew it in User settings",
+        "S3 key uploads/2024/" + UUID + ".png",
+        "pip install detect-secrets==1.5.0 works on python 3.12")
 dg = tempfile.mkdtemp(prefix="optmem-guard-")
 for s in CREDS:
     r = run("note", "the key is " + s, store=dg)
@@ -690,6 +750,30 @@ for s in CREDS:
     check(os.path.getsize(os.path.join(dg, "LOG.txt")) == size_,
           "a refused import wrote something")
 shutil.rmtree(dg)
+
+# the rules are generated (tools/gen_credentials.py --check compares them
+# with their sources); here, that the block is whole and every rule compiles
+with open(MEMO, encoding="utf-8") as f:
+    memo_src = f.read()
+check(memo_src.count("# BEGIN GENERATED") == 1
+      and memo_src.count("# END GENERATED") == 1
+      and memo_src.index("# BEGIN GENERATED")
+      < memo_src.index("# END GENERATED"),
+      "memo lost its generated-rules markers")
+check(len(cli.CREDENTIAL_RULES) > 200, "the generated rules are missing")
+for rule in cli.CREDENTIAL_RULES + cli.CREDENTIAL_EXTRA:
+    words, pattern, group, entropy, drop, keep = rule
+    try:
+        rx = re.compile(pattern, re.ASCII)
+        for sub in drop + keep:
+            re.compile(sub)
+        sound = (words and all(w == w.lower() for w in words)
+              and (group in (0, "refine") or isinstance(group, int))
+              and re.fullmatch(r"(>=?\d+(\.\d+)?)?", entropy) is not None
+              and (not isinstance(group, str) or group in rx.groupindex))
+    except re.error:
+        sound = False
+    check(sound, "a credential rule is malformed: %r" % (pattern[:40],))
 
 # the same blank-record dead end at the other site: a big block's half
 d4 = tempfile.mkdtemp(prefix="optmem-half-")
