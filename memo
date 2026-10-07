@@ -460,7 +460,7 @@ def pending_count(d, T):
     return n
 
 
-def nap_prompt(d, lo, hi, left):
+def nap_prompt(d, lo, hi, left, brief=False):
     if hi - lo <= RAW_MAX:
         body = "\n".join("  #%d %s %s" % e for e in log_slice(d, lo, hi))
     else:
@@ -478,21 +478,40 @@ def nap_prompt(d, lo, hi, left):
     tail = "" if not left else "\n%s after this one." % (
         "1 compression remains" if left == 1 else
         "%d compressions remain" % left)
-    return ("Compress memories #%d-%d into one line of at most %d bytes.\n"
-            "Keep what has lasting effect, drop what does not. Invent "
-            "nothing. Never include a date or timestamp; start directly "
-            "with the lasting fact.\n\n"
-            "%s\n%s\n"
+    if brief:
+        # Chained naps: the full rules are the previous output, one step up
+        # the context, so each nap of a backlog pays for them once.
+        rules = "by the same rules as the last one (a bare nap repeats them).\n"
+    else:
+        # The verb is "distill", not "compress": a compressor squeezes every
+        # input into the line, a distiller keeps the ranked few that last.
+        rules = ("It stands in for them in every later wake; recall still "
+                 "finds each memory word for word.\n"
+                 "Wake shows it only after newer memories, so work shown here "
+                 "as open has since finished: keep outcomes, leave open "
+                 "states out.\n"
+                 "Keep only lasting items, ones a later session would act on, "
+                 "in this order:\n"
+                 "1. Rules and preferences you were given.\n"
+                 "2. Decisions, with their reasons.\n"
+                 "3. Facts about systems that stay true.\n"
+                 "4. Outcomes of finished work, one phrase each.\n"
+                 "Fit the line by leaving out whole items, in full words. "
+                 "Invent nothing. Never include a date or timestamp; start "
+                 "directly with the lasting fact.\n")
+    return ("Distill memories #%d-%d (%d memories) into one line of at most "
+            "%d bytes%s%s\n%s\n%s\n"
             "Run: %s nap %d-%d \"<your line>\""
-            % (lo, hi - 1, ENTRY_CHARS, body, tail, ME, lo, hi - 1))
+            % (lo, hi - 1, hi - lo, ENTRY_CHARS, ", " if brief else ".\n",
+               rules, body, tail, ME, lo, hi - 1))
 
 
-def next_nap(d, T):
+def next_nap(d, T, brief=False):
     todo = pending(d, T, limit=1)
     if not todo:
         return None
     lo, hi = todo[0]
-    return nap_prompt(d, lo, hi, pending_count(d, T) - 1)
+    return nap_prompt(d, lo, hi, pending_count(d, T) - 1, brief)
 
 
 # ---------------------------------------------------------------- commands
@@ -689,7 +708,7 @@ def cmd_nap(d, args):
             print("%d-%d was settled or forgotten meanwhile." % (lo, hi - 1))
         else:
             print("%d-%d saved." % (lo, hi - 1))
-    nap = next_nap(d, T)
+    nap = next_nap(d, T, brief=said)
     if not nap:
         print("Nothing left to compress.")
         return
