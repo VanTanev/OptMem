@@ -3,8 +3,8 @@
 
   {memo} init             create this memory; print the setup block.
   {memo} wake [part [T]]  read your memory. Run first, every session.
-  {memo} note "..."       record one memory: one short line.
-  {memo} nap [id "..."]   do the pending compressions.
+  {memo} note - <<'MEMO'  record one memory: the line, then MEMO.
+  {memo} nap [id -]       do the pending compressions (id: line on stdin).
   {memo} recall <regex>   search every memory ever recorded.
   {memo} zoom <lo>-<hi>   open a tree node: its two halves.
   {memo} forget <lo>-<hi> drop a bad summary; nap rebuilds it.
@@ -29,7 +29,7 @@ from collections import deque
 # The store is UTF-8 by construction, so the tool reads and prints UTF-8
 # no matter what the machine's locale says. Without this, one arrow in a
 # memory makes wake crash on a latin-1 locale.
-for _s in (sys.stdout, sys.stderr):
+for _s in (sys.stdin, sys.stdout, sys.stderr):
     if hasattr(_s, "reconfigure"):  # Python 3.7+
         _s.reconfigure(encoding="utf-8")
 
@@ -432,6 +432,30 @@ def check(text):
     return text
 
 
+def handover(sub, line="<your line>"):
+    """The order that hands a line to `memo <sub> -` on stdin, through a
+    quoted heredoc. Memories quote commands, and a shell expands `...`,
+    $(...) and $VAR inside "...": a line retyped from them would run code or
+    lose words. `<<'MEMO'` expands nothing, and no one line can end it early
+    but `MEMO` itself, which is refused as empty."""
+    return "%s %s - <<'MEMO'\n%s\nMEMO" % (ME, sub, line)
+
+
+def given(arg):
+    """The text of a memory as passed: the argument itself, or, for `-`, the
+    line on stdin. Reading stops one character past what any memory can be
+    (4 bytes a character, plus a CRLF), so a runaway pipe is refused, not
+    read whole."""
+    if arg != "-":
+        return arg
+    cap = 4 * ENTRY_CHARS + 2
+    text = sys.stdin.read(cap + 1)
+    if len(text) > cap:
+        die("Too long: more than %d characters on stdin, limit %d bytes. "
+            "Compress it further." % (cap, ENTRY_CHARS))
+    return text.lstrip("\ufeff")  # the byte-order mark some Windows pipes add
+
+
 # ---------------------------------------------------------------- naps
 
 def pending(d, T, limit=None):
@@ -501,9 +525,9 @@ def nap_prompt(d, lo, hi, left, brief=False):
                  "directly with the lasting fact.\n")
     return ("Distill memories #%d-%d (%d memories) into one line of at most "
             "%d bytes%s%s\n%s\n%s\n"
-            "Run: %s nap %d-%d \"<your line>\""
+            "Run: %s"
             % (lo, hi - 1, hi - lo, ENTRY_CHARS, ", " if brief else ".\n",
-               rules, body, tail, ME, lo, hi - 1))
+               rules, body, tail, handover("nap %d-%d" % (lo, hi - 1))))
 
 
 def next_nap(d, T, brief=False):
@@ -533,10 +557,16 @@ then do exactly what it prints, to the end of its output.
 
 ### While working: register memories (mandatory)
 
-Call `{memo} note "<1 line, max {chars} bytes>"` whenever you learn
-something new, or something worth keeping happens. That covers a task
-worth real effort, a fact or insight the user teaches you, anything you
-learn about their life (even indirectly), any event of lasting effect.
+Record a memory whenever you learn something new, or something worth
+keeping happens. That covers a task worth real effort, a fact or insight
+the user teaches you, anything you learn about their life (even
+indirectly), any event of lasting effect:
+
+```sh
+{memo} note - <<'MEMO'
+<1 line, max {chars} bytes>
+MEMO
+```
 
 Never include a date or timestamp in memory text. OptMem records dates
 separately. Start each note and compression directly with the lasting fact.
@@ -619,8 +649,8 @@ def cmd_wake(d, args):
     # A part is rendered as of T, so a note landing between two parts cannot
     # shift a boundary and drop a line.
     if not T:
-        print("No memories yet. Record the first with: %s note \"<one line>\""
-              % ME)
+        print("No memories yet. Record the first with:\n%s"
+              % handover("note", "<one line>"))
         print("You are awake.")
         return
     lines = []
@@ -676,9 +706,9 @@ def cmd_wake(d, args):
 
 def cmd_note(d, args):
     if len(args) != 1:
-        die("usage: %s note \"<one line, at most %d bytes>\""
-            % (ME, ENTRY_CHARS))
-    text = check(args[0])
+        die("usage: %s\n(or the line as one argument instead of -)"
+            % handover("note", "<one line, at most %d bytes>" % ENTRY_CHARS))
+    text = check(given(args[0]))
     i = log_append(d, [(datetime.date.today().isoformat(), text)])
     print("Saved as #%d." % i)
     nap = next_nap(d, i + 1)
@@ -691,7 +721,7 @@ def cmd_nap(d, args):
     if args:
         said = True
         if len(args) != 2:
-            die("usage: %s nap <lo>-<hi> \"<one line>\"" % ME)
+            die("usage: %s" % handover("nap <lo>-<hi>", "<one line>"))
         lo, hi = block_id(args[0])
         todo = pending(d, T, limit=1)
         if not todo:
@@ -704,7 +734,7 @@ def cmd_nap(d, args):
                 die("Wrong block: %s. Blocks are built in order; the next is "
                     "%d-%d. Run: %s nap"
                     % (args[0], todo[0][0], todo[0][1] - 1, ME))
-        elif not tree_put(d, lo, hi, check(args[1])):
+        elif not tree_put(d, lo, hi, check(given(args[1]))):
             print("%d-%d was settled or forgotten meanwhile." % (lo, hi - 1))
         else:
             print("%d-%d saved." % (lo, hi - 1))
