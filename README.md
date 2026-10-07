@@ -3,6 +3,14 @@
 Permanent memory for AI agents. A 426-token prompt, a script, plug and play.
 
 A fork of [VictorTaelin/OptMem](https://github.com/VictorTaelin/OptMem).
+It keeps the intent of the original author and adds some fixes:
+
+- `note` refuses a memory that looks like a credential.
+- `note` and `nap` read lines from a quoted heredoc, so the shell does not change them.
+- Memory text has no dates. OptMem records dates separately.
+- A nap distills by a ranked keep order.
+- A default `wake` is one part.
+- A memory that contains a line separator stays one line, and `wake` rebuilds a torn summary.
 
 ![how OptMem works](anim/optmem.gif)
 
