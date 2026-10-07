@@ -173,13 +173,22 @@ subprocess.run(memo + ["note", "the first thing that happened"], env=bare,
                capture_output=True)
 asked = subprocess.run(memo + ["note", "the second thing that happened"],
                        env=bare, capture_output=True, text=True)
-order = [l[5:] for l in asked.stdout.splitlines() if l.startswith("Run: ")]
+order = re.findall(r"^Run: (.*\n<your line>\nMEMO)$", asked.stdout, re.M)
 check(len(order) == 1, "note did not order a compression: " + asked.stdout)
-obeyed = subprocess.run(order[0].replace('"<your line>"', '"both things"'),
+# Memories quote commands. A line retyped into the order must reach the store
+# as written: nothing in it may run, and no word may vanish.
+marker = os.path.join(fresh["HOME"], "ran")
+line = "both $(touch %s) `touch %s` $HOME \"q\" 'a'" % (marker, marker)
+obeyed = subprocess.run(order[0].replace("<your line>", line) if order else "",
                         shell=True, env=bare, capture_output=True, text=True)
 check(obeyed.returncode == 0 and "saved" in obeyed.stdout,
       "the order the tool printed does not run with nothing on PATH: %r -> %s"
-      % (order[0], obeyed.stderr.strip()))
+      % (order, obeyed.stderr.strip()))
+check(not os.path.exists(marker), "the printed order ran code from the line")
+with open(os.path.join(fresh["HOME"], ".optmem", "memory", "TREE", "2"),
+          "rb") as f:
+    saved = f.read().decode().rstrip()
+check(saved == line, "the printed order changed the line: %r" % saved)
 
 # a size written by hand into `config` must not brick the tool with a
 # recovery that is itself broken: name the file and the line
@@ -215,6 +224,21 @@ for sep in ("\r", "\x0b", "\x0c", "\x1c", "\x1d", "\x1e", "\x85", "\u2028", "\u2
           "note accepted a line split by %r" % sep)
 r = run("note", "   ")
 check(r.returncode == 1, "empty note accepted")
+# `-` takes the line from stdin; the cap refuses a runaway pipe, never cuts it
+store_ = tempfile.mkdtemp(prefix="optmem-stdin-")
+for given_, accept in (("a line from stdin\n", True), ("\ufeffa BOM line\n", True),
+                   ("two\nlines\n", False), ("", False),
+                   ("x" * 2000, False)):
+    r_ = subprocess.run(memo + ["note", "-"], input=given_, capture_output=True,
+                        text=True, env=dict(os.environ, MEMORY_DIR=store_))
+    check((r_.returncode == 0) == accept and "Traceback" not in r_.stderr,
+          "note - with %r: %s" % (given_[:20], r_.stdout + r_.stderr))
+r_ = subprocess.run(memo + ["recall", "line"], capture_output=True, text=True,
+                    env=dict(os.environ, MEMORY_DIR=store_))
+check("#0 " in r_.stdout and " a line from stdin" in r_.stdout
+      and " a BOM line" in r_.stdout and "\ufeff" not in r_.stdout,
+      "note - stored the wrong text: " + r_.stdout)
+shutil.rmtree(store_)
 r = run("wake")
 check("No memories yet" in r.stdout, "empty wake should say so")
 check(r.stdout.rstrip().endswith("You are awake."),

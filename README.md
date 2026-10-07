@@ -21,7 +21,7 @@ The tool lands at `~/.optmem/memo`; put `~/.optmem` on `PATH` to type `memo`.
 | | |
 |---|---|
 | `memo wake` | read the memory — the first command of every session |
-| `memo note "..."` | record one memory: one line, up to 280 bytes |
+| `memo note - <<'MEMO'` | record one memory: one line, up to 280 bytes, then `MEMO` |
 | `memo nap` | answer the merges that came due |
 | `memo recall <regex>` | search every memory ever recorded, word for word |
 | `memo zoom <lo>-<hi>` | open a tree node into its two halves |
@@ -60,7 +60,7 @@ Set `$MEMORY_DIR` to keep `memory/` elsewhere — a synced folder, a git repo.
 
 This is what the installer prints, and the whole of the integration.
 
-```markdown
+````markdown
 ## Memory
 
 Your memory is OptMem:
@@ -77,10 +77,16 @@ then do exactly what it prints, to the end of its output.
 
 ### While working: register memories (mandatory)
 
-Call `~/.optmem/memo note "<1 line, max 280 bytes>"` whenever you learn
-something new, or something worth keeping happens. That covers a task
-worth real effort, a fact or insight the user teaches you, anything you
-learn about their life (even indirectly), any event of lasting effect.
+Record a memory whenever you learn something new, or something worth
+keeping happens. That covers a task worth real effort, a fact or insight
+the user teaches you, anything you learn about their life (even
+indirectly), any event of lasting effect:
+
+```sh
+~/.optmem/memo note - <<'MEMO'
+<1 line, max 280 bytes>
+MEMO
+```
 
 Never include a date or timestamp in memory text. OptMem records dates
 separately. Start each note and compression directly with the lasting fact.
@@ -106,4 +112,4 @@ Parallel sessions on this machine are all you, and may all write memories.
 A subagent is not: it must never run `memo`, because it cannot judge what
 is already known, and its notes would arrive duplicated and incorrectly.
 When you spawn one, write: `You are a subagent. Don't run memo.`
-```
+````
