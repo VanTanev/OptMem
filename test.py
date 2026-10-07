@@ -610,6 +610,87 @@ for sep in ("\x0b", "\x0c", "\x1c", "\x1d", "\x1e", "\x85", "\u2028", "\u2029"):
           "import accepted a memory split by %r" % sep)
 shutil.rmtree(d3)
 
+# a credential in a memory is permanent: the log is append-only and every
+# wake hands it to every future session. The shapes are built by joining
+# pieces, so this file does not itself look like it holds a secret.
+CREDS = ("sk-" + "ant-api03-" + "a1B2" * 6, "sk-" + "proj-" + "Z9y8" * 6,
+         "sk-" + "a1B2c3D4" * 3, "gh" + "p_" + "a1" * 18,
+         "github" + "_pat_" + "1a" * 20, "AK" + "IA" + "ABCDEFGH23456789",
+         "xo" + "xb-" + "1234567890-abcdef", "-----BEGIN " + "RSA PRIVATE KEY",
+         "AI" + "za" + "b1" * 17 + "c", "sk_" + "live_" + "c3" * 12,
+         "gl" + "pat-" + "d4" * 10,
+         "ey" + "JhbGciOiJIUzI1NiJ9.ey" + "JzdWIiOiIxMjM0NTY3ODkwIn0.sig",
+         "AS" + "IA" + "ABCDEFGH23456789", "sk_" + "test_" + "c3" * 12,
+         "hf" + "_" + "a1B2" * 9, "npm" + "_" + "a1B2" * 9,
+         "xa" + "pp-1-A0123456789-abcdef", "ya" + "29." + "a1B2c3" * 4,
+         "OPENAI_KEY_" + "sk-" + "a1B2c3D4" * 3,
+         # shapes from gitleaks' default rules
+         "py" + "pi-AgEIcHlwaS5vcmc" + "a1B2" * 13, "sb" + "p_" + "0a1b" * 10,
+         "sb_" + "secret_" + "a1B2" * 6, "do" + "p_v1_" + "0a" * 32,
+         "SG" + ".a1B2c3D4e5F6g7H8i9J0kL." + "a1B2c3D4e5F6g7H8i9J0" * 2 + "abc",
+         "SK" + "0123456789abcdef" * 2, "ts" + "key-auth-" + "kA1b2C3d4E5f6G7h8I9j0",
+         "lin" + "_api_" + "a1B2" * 10, "ops" + "_eyJ" + "a1B2" * 20,
+         "https://hooks.slack.com/" + "services/T0000/B0000/" + "a1B2" * 6,
+         "postgres://app:" + "s3cretPass" + "@db.internal/app",
+         "wh" + "sec_" + "a1B2" * 8, "sk-" + "or-v1-" + "0a1b" * 8,
+         "shp" + "at_" + "0a1b" * 8, "da" + "pi" + "0a1b" * 8,
+         "AGE-SECRET-" + "KEY-1" + "QPZRY9X8GF" * 5 + "QPZRY9X8")
+# ...and none of these is one: they must still be recorded
+FINE = ("key is op://Vault/Item/field",
+        "the task-orchestration-pipeline-for-deploys is live",
+        "risk-assessment-2026-matrix-v2 approved", "uses sk-learn for this",
+        "desk-reservation-2026-team-offsite-v2 booked",
+        "set npm_config_cache and use hf_hub_download",
+        "AKIA is the prefix of an AWS access key id",
+        "read sk-learn-v1-2-upgrade-compatibility-notes first",
+        "the app reads postgres://app:$PGPASSWORD@db/app",
+        "a DSN is postgres://USER:<password>@host/db",
+        "clone ssh://git@github.com:22/org/repo.git",
+        "pin https://github.com:443/org/repo@main",
+        "1Password service tokens start with ops_ and Twilio keys with SK",
+        "tests use postgres://postgres:postgres@db:5432/app",
+        "the router is http://admin:admin@router.local by default",
+        "logged as https://user:***@host, https://user:REDACTED@host",
+        "or https://user:xxx@host and https://user:password@host",
+        "tskey-reusable-keys-are-configured-in-admin",
+        "sb_secret_keys_are_rotated_monthly")
+dg = tempfile.mkdtemp(prefix="optmem-guard-")
+for s in CREDS:
+    r = run("note", "the key is " + s, store=dg)
+    check(r.returncode == 1 and "credential" in r.stderr,
+          "note accepted a credential shaped like %r" % s[:6])
+    check(s not in r.stdout + r.stderr, "the refusal echoed the credential")
+check(os.path.getsize(os.path.join(dg, "LOG.txt")) == 0,
+      "a refused note was written anyway")
+for s in FINE:
+    r = run("note", s, store=dg)
+    check(r.returncode == 0, "note refused an ordinary memory %r: %s"
+          % (s, r.stderr))
+# nap writes a summary through the same guard
+while True:
+    bid = nap_id(run("nap", store=dg).stdout)
+    if not bid:
+        break
+    for s in CREDS:
+        r = run("nap", bid, "x " + s, store=dg)
+        check(r.returncode == 1 and "credential" in r.stderr,
+              "nap accepted a credential shaped like %r" % s[:6])
+    run("nap", bid, "settled", store=dg)
+# import is the third way in, and must refuse the same
+day = datetime.date.today().isoformat()
+for s in CREDS:
+    p = os.path.join(dg, "bad-import.txt")
+    with open(p, "w", encoding="utf-8", newline="") as f:
+        f.write("%s key %s\n" % (day, s))
+    size_ = os.path.getsize(os.path.join(dg, "LOG.txt"))
+    r = run("import", p, store=dg)
+    check(r.returncode == 1 and "credential" in r.stderr
+          and s not in r.stdout + r.stderr,
+          "import accepted a credential shaped like %r" % s[:6])
+    check(os.path.getsize(os.path.join(dg, "LOG.txt")) == size_,
+          "a refused import wrote something")
+shutil.rmtree(dg)
+
 # the same blank-record dead end at the other site: a big block's half
 d4 = tempfile.mkdtemp(prefix="optmem-half-")
 for i in range(32):

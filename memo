@@ -425,6 +425,46 @@ def block_id(s):
     return lo, hi
 
 
+# A credential noted once is kept forever -- the log is never edited -- and
+# every wake hands it to every future session. Only shapes that are hardly
+# ever anything else: a false alarm costs a rephrase, a miss costs a leak.
+# An `sk-` key holds hyphens only after a vendor's prefix, and otherwise
+# wants a digit: `sk-learn-v1-2-notes` is a word, not a key, and a real key
+# of 20 random characters holds a digit all but always.
+CREDENTIAL = re.compile(
+    r"(?<![A-Za-z0-9])(?:"
+    r"sk-(?:ant|proj|svcacct|admin|None|or)-[\w-]{20,}"  # Anthropic, OpenAI,
+    r"|sk-(?=\w*\d)[A-Za-z0-9_]{20,}"                     # OpenRouter...
+    r"|gh[pousr]_[A-Za-z0-9]{30,}|github_pat_\w{30,}"     # GitHub
+    r"|(?:AKIA|ASIA)[0-9A-Z]{16}"                         # AWS access key
+    r"|xox[abeprs]-[A-Za-z0-9-]{10,}|xapp-[A-Za-z0-9-]{10,}"  # Slack
+    r"|AIza[0-9A-Za-z_-]{35}|ya29\.[\w-]{20,}"            # Google
+    r"|[rs]k_(?:live|test)_[0-9A-Za-z]{20,}"              # Stripe
+    r"|glpat-[A-Za-z0-9_-]{20,}"                          # GitLab
+    r"|hf_[A-Za-z0-9]{30,}|npm_[A-Za-z0-9]{36}"           # Hugging Face, npm
+    r"|eyJ[\w-]{8,}\.eyJ[\w-]{8,}\."                      # a JWT
+    # from gitleaks' default rules: PyPI, Supabase, DigitalOcean,
+    # SendGrid, Twilio, Tailscale, Linear, 1Password service accounts, Stripe
+    # webhooks, Shopify, Databricks, age
+    r"|pypi-AgEIcHlwaS5vcmc[\w-]{20,}|sbp_[0-9a-f]{40}|sb_secret_(?=[\w-]*\d)[\w-]{16,}"
+    r"|do[opr]_v1_[0-9a-f]{64}|SG\.[\w-]{22}\.[\w-]{43}|SK[0-9a-fA-F]{32}"
+    r"|tskey-[a-z]+-(?=[\w-]*\d)[\w-]{16,}|lin_api_[A-Za-z0-9]{40}|ops_eyJ[\w+/]{40,}"
+    r"|whsec_[A-Za-z0-9+/]{24,}|shp(?:at|ca|pa|ss)_[0-9a-fA-F]{32}"
+    r"|dapi[0-9a-f]{32}|AGE-SECRET-KEY-1[0-9A-Z]{58}"
+    r")|-----BEGIN [A-Z ]*PRIVATE KEY"
+    # a Slack webhook, and a password written into a URL -- not a variable,
+    # a placeholder, a redaction, or the user's own name, the default of every
+    # local database (postgres:postgres)
+    r"|hooks\.slack\.com/(?:services|workflows|triggers)/[A-Za-z0-9+/]{20,}"
+    r"|://([^\s/:@]+):(?![$<{%*]|\1@|(?:x+|X+|\.+|(?i:redacted|password|"
+    r"secret|pass))@)[^\s/@]+@")
+
+
+CREDENTIAL_REFUSAL = ("That looks like a credential, and a memory is "
+                      "permanent. Record where the secret lives, never its "
+                      "value.")
+
+
 def check(text):
     text = text.strip()
     if not text:
@@ -437,6 +477,8 @@ def check(text):
     if n > ENTRY_CHARS:
         die("Too long: %d bytes, limit %d. Accented characters cost 2 bytes. "
             "Compress it further." % (n, ENTRY_CHARS))
+    if CREDENTIAL.search(text):
+        die(CREDENTIAL_REFUSAL)
     return text
 
 
@@ -875,6 +917,8 @@ def cmd_import(d, args):
                 % (i, len(text.splitlines())))
         if not text or len(text.encode()) > ENTRY_CHARS:
             die("line %d: %d bytes, limit %d." % (i, len(text.encode()), ENTRY_CHARS))
+        if CREDENTIAL.search(text):
+            die("line %d: %s" % (i, CREDENTIAL_REFUSAL))
         out.append((date, text))
         last = date
     if not out:
