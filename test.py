@@ -295,7 +295,15 @@ check(naps == len(complete(N)), "did %d naps, expected %d" % (naps, len(complete
 r = run("wake")
 check(r.returncode == 0, "wake still refuses after a full nap chain")
 
+# at the default sizes, a full memory of full-length lines is one part:
+# a wake is one command
+r = run("wake")
+check("You are awake." in r.stdout and len(r.stdout) <= PART_CHARS + 2000,
+      "a default wake needs more than one part:\n" + r.stdout[-300:])
+
 # the document survives pagination, and every part fits every harness's cap
+with open(os.path.join(d, "config"), "w") as f:
+    f.write("PART_CHARS = 10000\n")
 parts, k = [], 1
 while True:
     r = run("wake", str(k))
@@ -318,6 +326,7 @@ check(re.search(r"Run: \S*memo wake 2", run("wake").stdout),
 check("You are awake." in run("wake", str(len(parts))).stdout,
       "last part must say it is last")
 check(run("wake", str(len(parts) + 1)).returncode == 1, "a nonexistent part should fail")
+os.remove(os.path.join(d, "config"))
 
 # append-only: nothing was ever rewritten
 logsz = os.path.getsize(os.path.join(d, "LOG.txt"))
@@ -666,7 +675,7 @@ def fingerprint(path):
 # back, an empty value restores the default, and a wake obeys immediately --
 # nothing is recomputed, because a size only selects what gets printed.
 r = run("config", "WAKE_LINES=12")
-check("12" in r.stdout and "default 96" in r.stdout, "config did not set:\n" + r.stdout)
+check("12" in r.stdout and "default %d" % WAKE_LINES in r.stdout, "config did not set:\n" + r.stdout)
 check(len(run("wake").stdout.splitlines()) <= 13, "wake ignored the new size")
 r = run("config", "WAKE_LINES=")
 check("default" not in r.stdout, "an empty value did not restore the default")
