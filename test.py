@@ -206,6 +206,13 @@ r = run("note", "x" * 281)
 check(r.returncode == 1 and "Too long" in r.stderr, "over-long note accepted")
 r = run("note", "two\nlines")
 check(r.returncode == 1 and "one line" in r.stderr, "multi-line note accepted")
+# a memory is one line the way wake's readers count lines: every boundary
+# str.splitlines() knows, not just \n and \r. one of these in a note would be
+# stored as one line and printed as two, forging a line in wake's output.
+for sep in ("\r", "\x0b", "\x0c", "\x1c", "\x1d", "\x1e", "\x85", "\u2028", "\u2029"):
+    r = run("note", "a" + sep + "b")
+    check(r.returncode == 1 and "one line" in r.stderr,
+          "note accepted a line split by %r" % sep)
 r = run("note", "   ")
 check(r.returncode == 1, "empty note accepted")
 r = run("wake")
@@ -525,6 +532,31 @@ check(r_.returncode == 1 and "Permission denied" in r_.stderr
       "an unreadable level was read as pending work: " + r_.stdout + r_.stderr)
 os.chmod(os.path.join(d3, "TREE", "2"), 0o644)
 
+# a crash mid-write leaves a partial record at the end of a level too. It was
+# never acknowledged and count() does not see it, so the block is not built
+# and `forget` has nothing to drop: wake must offer the nap that rebuilds it,
+# instead of reading the fragment as the summary
+d4 = tempfile.mkdtemp(prefix="optmem-torn-")
+for i in range(6):
+    run("note", "torn store memory %d" % i, store=d4)
+for bid, s in (("0-1", "one"), ("2-3", "two"),
+               ("4-5", "a café far from the sea"), ("0-3", "all")):
+    run("nap", bid, s, store=d4)
+with open(os.path.join(d4, "config"), "w") as f:
+    f.write("WAKE_LINES = 2\n")
+for cut in (7, 6):  # the fragment decodes; the fragment splits a character
+    with open(os.path.join(d4, "TREE", "2"), "r+b") as f:
+        f.truncate(2 * 288 + cut)
+    r = run("wake", store=d4)
+    check("#4-5 a caf" not in r.stdout,
+          "a torn summary was read as a memory:\n" + r.stdout)
+    check(nap_id(r.stdout) == "4-5",
+          "a torn summary must point at the nap that rebuilds it:\n"
+          + r.stdout + r.stderr)
+run("nap", "4-5", "rebuilt", store=d4)
+r = run("wake", store=d4)
+check("#4-5 rebuilt" in r.stdout, "a torn summary did not rebuild:\n" + r.stdout)
+
 # an impossible calendar date would poison every later import: the store's
 # order check compares against it forever
 with open(os.path.join(d3, "bad.txt"), "w") as f:
@@ -532,6 +564,17 @@ with open(os.path.join(d3, "bad.txt"), "w") as f:
 r = run("import", os.path.join(d3, "bad.txt"), store=d3)
 check(r.returncode == 1 and "not a real date" in r.stderr,
       "import accepted an impossible date: " + r.stdout + r.stderr)
+
+# a line separator smuggled past readlines() -- it splits only on \n and \r
+# -- would be stored as one memory and printed as two, forging a line in
+# wake's output. note is guarded by check(); import must refuse the same.
+for sep in ("\x0b", "\x0c", "\x1c", "\x1d", "\x1e", "\x85", "\u2028", "\u2029"):
+    p = os.path.join(d3, "sep.txt")
+    with open(p, "w", encoding="utf-8") as f:
+        f.write("%s a memory%sb\n" % (datetime.date.today().isoformat(), sep))
+    r = run("import", p, store=d3)
+    check(r.returncode == 1 and "one line" in r.stderr,
+          "import accepted a memory split by %r" % sep)
 shutil.rmtree(d3)
 
 # the same blank-record dead end at the other site: a big block's half
