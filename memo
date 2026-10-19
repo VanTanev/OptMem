@@ -1208,6 +1208,9 @@ def nap_prompt(d, lo, hi, left, brief=False):
                  "2. Decisions, with their reasons.\n"
                  "3. Facts about systems that stay true.\n"
                  "4. Outcomes of finished work, one phrase each.\n"
+                 "Write each rule with its scope, the task or tool it covers; "
+                 "a rule cut loose from its scope says more than you were "
+                 "given, so leave out the whole rule instead.\n"
                  "Fit the line by leaving out whole items, in full words. "
                  "Invent nothing. Never include a date or timestamp; start "
                  "directly with the lasting fact.\n")
