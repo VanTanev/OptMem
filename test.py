@@ -274,6 +274,8 @@ check("Never include a date or timestamp" in r.stdout,
       "nap prompt must keep date metadata out of summaries")
 check("1. Rules and preferences" in r.stdout,
       "a bare nap must show the full rules")
+check("Write each rule with its scope" in r.stdout,
+      "nap prompt must keep a rule's scope, or a summary widens the rule")
 while "Nothing left to compress" not in r.stdout:
     line = offered(r.stdout)
     check(bool(line), "no command offered:\n" + r.stdout + r.stderr)
