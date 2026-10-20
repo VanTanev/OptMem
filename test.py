@@ -17,6 +17,11 @@ import sys
 import tempfile
 from importlib.machinery import SourceFileLoader
 
+# memo speaks UTF-8 on every pipe; text=True pipes here must too. Windows
+# defaults them to the ANSI code page, so rerun in UTF-8 mode.
+if os.name == "nt" and not sys.flags.utf8_mode:
+    sys.exit(subprocess.call([sys.executable, "-X", "utf8"] + sys.argv))
+
 HERE = os.path.dirname(os.path.realpath(__file__))
 MEMO = os.path.join(HERE, "memo")
 cli = SourceFileLoader("memo_cli", MEMO).load_module()
@@ -171,6 +176,13 @@ check(woke.returncode == 0 and "You are awake." in woke.stdout,
 # `curl | sh` puts nothing on PATH, so a bare `memo nap ...` would not: the
 # whole loop (note -> merge prompt -> nap) dies on `command not found`.
 bare = dict(fresh, PATH="/usr/bin:/bin")
+# The orders are POSIX sh. On Windows that is Git Bash (what Claude Code
+# runs), not cmd.exe, and the python3 it finds is not in /usr/bin: keep the
+# PATH, which holds no memo either.
+SH = ["/bin/sh", "-c"]
+if os.name == "nt":
+    SH = [shutil.which("sh"), "-c"]
+    bare = dict(fresh)
 subprocess.run(memo + ["note", "the first thing that happened"], env=bare,
                capture_output=True)
 asked = subprocess.run(memo + ["note", "the second thing that happened"],
@@ -181,8 +193,8 @@ check(len(order) == 1, "note did not order a compression: " + asked.stdout)
 # as written: nothing in it may run, and no word may vanish.
 marker = os.path.join(fresh["HOME"], "ran")
 line = "both $(touch %s) `touch %s` $HOME \"q\" 'a'" % (marker, marker)
-obeyed = subprocess.run(order[0].replace("<your line>", line) if order else "",
-                        shell=True, env=bare, capture_output=True, text=True)
+obeyed = subprocess.run(SH + [order[0].replace("<your line>", line) if order else ""],
+                        env=bare, capture_output=True, text=True)
 check(obeyed.returncode == 0 and "saved" in obeyed.stdout,
       "the order the tool printed does not run with nothing on PATH: %r -> %s"
       % (order, obeyed.stderr.strip()))
@@ -209,7 +221,8 @@ open(badcfg, "w").write("")
 r_ = subprocess.run(memo + ["init"], capture_output=True, text=True,
                     env=dict(fresh, MEMORY_DIR=MEMO))   # a file, not a store
 check(r_.returncode == 1 and "Traceback" not in r_.stderr
-      and "Not a directory" in r_.stderr,
+      and ("Not a directory" in r_.stderr    # Windows words ENOTDIR so:
+           or "cannot find the path" in r_.stderr),
       "a filesystem error printed a traceback: " + r_.stderr)
 
 
@@ -560,14 +573,17 @@ check(r.returncode == 1 and "forget 0-1" in r.stderr
       "a blank summary must point at forget:\n" + r.stdout + r.stderr)
 
 # an unreadable level is a filesystem failure and must surface as one --
-# reading it as "not compressed yet" offers work that cannot be done
-os.chmod(os.path.join(d3, "TREE", "2"), 0)
-r_ = subprocess.run(memo + ["wake"], capture_output=True, text=True,
-                    env=dict(os.environ, MEMORY_DIR=d3))
-check(r_.returncode == 1 and "Permission denied" in r_.stderr
-      and "not compressed" not in r_.stdout,
-      "an unreadable level was read as pending work: " + r_.stdout + r_.stderr)
-os.chmod(os.path.join(d3, "TREE", "2"), 0o644)
+# reading it as "not compressed yet" offers work that cannot be done.
+# (Windows chmod only sets read-only: the file stays readable, so skip.)
+if os.name != "nt":
+    os.chmod(os.path.join(d3, "TREE", "2"), 0)
+    r_ = subprocess.run(memo + ["wake"], capture_output=True, text=True,
+                        env=dict(os.environ, MEMORY_DIR=d3))
+    check(r_.returncode == 1 and "Permission denied" in r_.stderr
+          and "not compressed" not in r_.stdout,
+          "an unreadable level was read as pending work: "
+          + r_.stdout + r_.stderr)
+    os.chmod(os.path.join(d3, "TREE", "2"), 0o644)
 
 # a crash mid-write leaves a partial record at the end of a level too. It was
 # never acknowledged and count() does not see it, so the block is not built
