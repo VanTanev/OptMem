@@ -58,6 +58,13 @@ KNOBS = {
 # fit PART_CHARS, so a default wake is one command.
 WAKE_LINES = KNOBS["WAKE_LINES"][0]
 ENTRY_CHARS = KNOBS["ENTRY_CHARS"][0]
+
+
+def target_words():
+    """The length to aim one memory at, in words. Agents cannot count bytes,
+    and a line of English costs about 8 bytes a word: 35 words in 280 bytes."""
+    return ENTRY_CHARS // 8
+
 # Every harness truncates a command that prints too much, and each drops a
 # different piece: Claude Code cuts the middle at 30,000 chars, pi cuts the
 # head at 50 KB, Codex budgets 10,000 tokens. So the memory is handed over in
@@ -1113,8 +1120,10 @@ def check(text):
             "separately." % len(lines))
     n = len(text.encode())
     if n > ENTRY_CHARS:
-        die("Too long: %d bytes, limit %d. Accented characters cost 2 bytes. "
-            "Compress it further." % (n, ENTRY_CHARS))
+        over = n - ENTRY_CHARS
+        cut = math.ceil(over * len(text.split()) / n)
+        die("Too long: %d bytes, %d over the limit of %d. Cut about %s."
+            % (n, over, ENTRY_CHARS, plural(cut, "word")))
     if credential(text):
         die(CREDENTIAL_REFUSAL)
     return text
@@ -1215,9 +1224,10 @@ def nap_prompt(d, lo, hi, left, brief=False):
                  "Invent nothing. Never include a date or timestamp; start "
                  "directly with the lasting fact.\n")
     return ("Distill memories #%d-%d (%d memories) into one line of at most "
-            "%d bytes%s%s\n%s\n%s\n"
+            "%d words (memo refuses more than %d bytes)%s%s\n%s\n%s\n"
             "Run: %s"
-            % (lo, hi - 1, hi - lo, ENTRY_CHARS, ", " if brief else ".\n",
+            % (lo, hi - 1, hi - lo, target_words(), ENTRY_CHARS,
+               ", " if brief else ".\n",
                rules, body, tail, handover("nap %d-%d" % (lo, hi - 1))))
 
 
@@ -1256,7 +1266,7 @@ indirectly), any event of lasting effect:
 
 ```sh
 {memo} note - <<'MEMO'
-<1 line, max {chars} bytes>
+<1 line, at most {words} words: memo refuses more than {chars} bytes>
 MEMO
 ```
 
@@ -1308,7 +1318,8 @@ def cmd_init(d, args):
     print()
     print("Paste this at the top of your agent's AGENTS.md (or CLAUDE.md), done:")
     print()
-    print(TEMPLATE.format(memo=ME, data=pretty(d), chars=ENTRY_CHARS).rstrip())
+    print(TEMPLATE.format(memo=ME, data=pretty(d), chars=ENTRY_CHARS,
+                          words=target_words()).rstrip())
 
 
 def paginate(lines):

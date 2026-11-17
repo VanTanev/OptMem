@@ -102,7 +102,7 @@ indirectly), any event of lasting effect:
 
 ```sh
 ~/.optmem/memo note - <<'MEMO'
-<1 line, max 280 bytes>
+<1 line, at most 35 words: memo refuses more than 280 bytes>
 MEMO
 ```
 
