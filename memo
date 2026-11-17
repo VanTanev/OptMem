@@ -58,12 +58,12 @@ KNOBS = {
 # fit PART_CHARS, so a default wake is one command.
 WAKE_LINES = KNOBS["WAKE_LINES"][0]
 ENTRY_CHARS = KNOBS["ENTRY_CHARS"][0]
+BYTES_PER_ENGLISH_WORD = 8
 
 
 def target_words():
-    """The length to aim one memory at, in words. Agents cannot count bytes,
-    and a line of English costs about 8 bytes a word: 35 words in 280 bytes."""
-    return ENTRY_CHARS // 8
+    return ENTRY_CHARS // BYTES_PER_ENGLISH_WORD
+
 
 # Every harness truncates a command that prints too much, and each drops a
 # different piece: Claude Code cuts the middle at 30,000 chars, pi cuts the

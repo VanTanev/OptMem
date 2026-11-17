@@ -215,7 +215,7 @@ check(r_.returncode == 1 and "Traceback" not in r_.stderr
 
 r = run("note", "x" * 281)
 check(r.returncode == 1 and "Too long" in r.stderr, "over-long note accepted")
-r = run("note", " ".join(["word"] * 60))   # 299 bytes, about 5 bytes a word
+r = run("note", " ".join(["word"] * 60))
 check(r.returncode == 1 and "299 bytes, 19 over the limit of 280. Cut about 4 words."
       in r.stderr, "over-long note does not say the cut: " + r.stderr)
 r = run("note", "two\nlines")
