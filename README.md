@@ -89,8 +89,9 @@ Without it you do not know who you are, or what was decided and tried.
 
 ### At startup: activating OptMem (mandatory)
 
-Run `~/.optmem/memo wake` before any other tool call, in every session, and
-then do exactly what it prints, to the end of its output.
+Run `~/.optmem/memo wake` bare, before any other tool call, in every session.
+Bare means no pipe, no `head` or `tail`, and no redirect: all of its output must come into your context.
+Then do exactly what it prints, to the end of its output.
 
 ### While working: register memories (mandatory)
 
