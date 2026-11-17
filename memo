@@ -1474,8 +1474,10 @@ def cmd_forget(d, args):
 
 
 def cmd_recall(d, args):
+    if args[:1] == ["-i"]:
+        args = args[1:]
     if len(args) != 1:
-        die("usage: %s recall <regex>" % ME)
+        die("usage: %s recall [-i] <regex> (case is always ignored)" % ME)
     try:
         pat = re.compile(args[0], re.I)
     except re.error as e:

@@ -351,6 +351,12 @@ check(r.returncode == 0 and "Nothing left to compress" in r.stdout,
 r = run("recall", "memory number 7,")
 check(r.returncode == 0 and "#7 " in r.stdout, "recall missed a memory")
 check("1 match." in r.stdout, "a single match is not `1 matches`: " + r.stdout)
+r = run("recall", "-i", "MEMORY NUMBER 7,")
+check(r.returncode == 0 and "#7 " in r.stdout,
+      "recall -i, as agents type it from grep, must work: " + r.stdout + r.stderr)
+r = run("recall", "-i")
+check(r.returncode != 0 and "recall [-i] <regex> (case is always ignored)" in r.stderr,
+      "recall -i with no regex must print the usage: " + r.stderr)
 r = run("recall", "^#7 ")
 check("memory number 7," in r.stdout, "recall cannot find a memory by id")
 r = run("recall", "2020-01-02")
