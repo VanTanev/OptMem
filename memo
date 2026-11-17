@@ -35,10 +35,25 @@ for _s in (sys.stdin, sys.stdout, sys.stderr):
         _s.reconfigure(encoding="utf-8")
 
 
+def home():
+    """The ~ of the shell that runs us. Windows Python reads USERPROFILE and
+    ignores HOME, but Git Bash expands ~ from HOME: follow the shell."""
+    return os.path.abspath(os.environ.get("HOME") or os.path.expanduser("~"))
+
+
+def expand(p):
+    """expanduser, with ~ meaning home()."""
+    if p == "~" or p.startswith("~/") or p.startswith("~" + os.sep):
+        return home() + p[1:]
+    return os.path.expanduser(p)
+
+
 def pretty(p):
-    """A path as the user would type it: keep symlinks, fold $HOME to ~."""
-    p, home = os.path.abspath(p), os.path.expanduser("~")
-    return "~" + p[len(home):] if p.startswith(home + os.sep) else p
+    """A path as the user would type it: keep symlinks, fold $HOME to ~.
+    Always with /: it lands in shell commands, and Git Bash eats backslashes."""
+    p, h = os.path.abspath(p), home()
+    p = "~" + p[len(h):] if p.startswith(h + os.sep) else p
+    return p.replace(os.sep, "/")
 
 
 # Every command this tool prints has to RUN. After `curl | sh` nothing is on
@@ -137,7 +152,7 @@ def cover(T, budget):
 # ---------------------------------------------------------------- store
 
 def memory_dir():
-    return os.path.expanduser(os.environ.get("MEMORY_DIR") or "~/.optmem/memory")
+    return expand(os.environ.get("MEMORY_DIR") or "~/.optmem/memory")
 
 
 def store():

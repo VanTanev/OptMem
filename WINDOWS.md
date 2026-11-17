@@ -34,3 +34,20 @@ python memo nap 0-1 'one summary line'
 
 Concurrency: 8 parallel `memo note` processes writing 1600 memories
 resulted in 1600/1600 records persisted (lock verified).
+
+## python3 in Git Bash
+
+`memo` starts with `#!/usr/bin/env python3`. On Windows the first `python3`
+on PATH is often the Microsoft Store stub, which prints "Python was not
+found" and exits. Put a real one ahead of it, for example `~/bin/python3`:
+
+```sh
+#!/bin/sh
+exec /c/Python310/python "$@"
+```
+
+## Tests
+
+`python test.py` runs on native Windows too. The printed orders run through
+Git Bash's `sh`, and the one check that needs an unreadable file is skipped:
+Windows `chmod` only sets read-only.
